@@ -42,13 +42,41 @@ const CelebrantProfile: React.FC = () => {
   useEffect(() => {
     let active = true;
 
+    const hydrate = (data: EnrichedCelebrant | null) => {
+      if (!active) return;
+      setCelebrant(data);
+      setLoading(false);
+      if (data) {
+        try {
+          sessionStorage.setItem('selectedCelebrant', JSON.stringify(data));
+        } catch {
+          // ignore storage errors
+        }
+      }
+    };
+
     // If we arrived via a Link with state, use it immediately
     if (locationCelebrant && (locationCelebrant.slug === slug || locationCelebrant.id === Number(slug))) {
-      setCelebrant(locationCelebrant);
-      setLoading(false);
+      hydrate(locationCelebrant);
       return () => {
         active = false;
       };
+    }
+
+    // Fallback to a cached selection so direct refreshes still work
+    try {
+      const stored = sessionStorage.getItem('selectedCelebrant');
+      if (stored) {
+        const parsed = JSON.parse(stored) as EnrichedCelebrant;
+        if (parsed.slug === slug || parsed.id === Number(slug)) {
+          hydrate(parsed);
+          return () => {
+            active = false;
+          };
+        }
+      }
+    } catch {
+      // ignore parse errors
     }
 
     if (!slug) {
@@ -58,11 +86,10 @@ const CelebrantProfile: React.FC = () => {
 
     getCelebrantBySlug(slug)
       .then((data) => {
-        if (!active) return;
-        setCelebrant(data ?? null);
+        hydrate(data ?? null);
       })
-      .finally(() => {
-        if (active) setLoading(false);
+      .catch(() => {
+        hydrate(null);
       });
 
     return () => {

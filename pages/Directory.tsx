@@ -361,6 +361,7 @@ const Directory: React.FC = () => {
                   key={`live-${celebrant.slug}-${idx}`}
                   to={`/celebrants/${celebrant.slug}`}
                   state={{ celebrant }}
+                  onClick={() => { try { sessionStorage.setItem('selectedCelebrant', JSON.stringify(celebrant)); } catch (_) {} }}
                   className="group celebrant-card bg-white border border-sage-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer"
                 >
                   <div className="h-80 w-full overflow-hidden relative">
@@ -453,6 +454,7 @@ const Directory: React.FC = () => {
                     key={celebrant.slug}
                     to={`/celebrants/${celebrant.slug}`}
                     state={{ celebrant }}
+                    onClick={() => { try { sessionStorage.setItem('selectedCelebrant', JSON.stringify(celebrant)); } catch (_) {} }}
                     className="group celebrant-card bg-white border border-sage-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 cursor-pointer"
                   >
                     <div className="h-80 w-full overflow-hidden relative">

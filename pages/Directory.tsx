@@ -497,7 +497,7 @@ const Directory: React.FC = () => {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Globe className="h-4 w-4" /> Website
-                          </Link>
+                          </a>
                         )}
                       </div>
                     </div>
@@ -512,7 +512,7 @@ const Directory: React.FC = () => {
           {testimonials.map((item) => (
             <div key={item.name} className="glass-surface rounded-2xl border border-sage-100 p-6 space-y-3">
               <Quote className="h-8 w-8 text-champagne-400" />
-              <p className="text-charcoal-700 leading-relaxed">�{item.quote}�</p>
+              <p className="text-charcoal-700 leading-relaxed">"{item.quote}"</p>
               <div>
                 <p className="text-charcoal-800 font-semibold">{item.name}</p>
                 <p className="text-charcoal-600 text-sm">{item.location}</p>
@@ -547,6 +547,7 @@ const Directory: React.FC = () => {
 };
 
 export default Directory;
+
 
 
 

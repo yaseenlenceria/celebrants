@@ -355,14 +355,11 @@ const Directory: React.FC = () => {
               const displayLocation = celebrant.livePlace?.fullAddress || celebrant.location;
               const rating = celebrant.livePlace?.rating ?? celebrant.rating;
               const image = celebrant.livePlace?.photos?.[0] || celebrant.image || fallbackImage;
-              const mapLink = celebrant.livePlace?.placeLink || celebrant.googleUrl || '#';
 
               return (
-                <a
+                <Link
                   key={`live-${celebrant.slug}-${idx}`}
-                  href={mapLink}
-                  target={mapLink === '#' ? undefined : '_blank'}
-                  rel="noreferrer"
+                  to={`/celebrants/${celebrant.slug}`}
                   className="group celebrant-card bg-white border border-sage-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer"
                 >
                   <div className="h-80 w-full overflow-hidden relative">
@@ -409,7 +406,7 @@ const Directory: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </a>
+                </Link>
               );
             })}
           </div>
@@ -485,8 +482,7 @@ const Directory: React.FC = () => {
                         <MapPin className="h-5 w-5 text-champagne-500 mt-0.5 flex-shrink-0" />
                         <span className="line-clamp-2">{displayLocation}</span>
                       </div>
-                      <p className="text-sm text-charcoal-600 leading-relaxed line-clamp-4">{celebrant.description}</p>
-                      <div className="flex items-center justify-between pt-2 border-t border-sage-100">
+                      <p className="text-sm text-charcoal-600 leading-relaxed line-clamp-4">{celebrant.description}</p>                    <div className="flex items-center justify-between pt-2 border-t border-sage-100">
                         <span className="text-xs text-charcoal-600 font-medium">{celebrant.ceremoniesPerformed}+ ceremonies</span>
                         {displayWebsite && (
                           <a
@@ -497,11 +493,11 @@ const Directory: React.FC = () => {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Globe className="h-4 w-4" /> Website
-                          </a>
+                          </Link>
                         )}
                       </div>
                     </div>
-                  </a>
+                  </Link>
                 );
               })}
             </div>
@@ -547,6 +543,20 @@ const Directory: React.FC = () => {
 };
 
 export default Directory;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

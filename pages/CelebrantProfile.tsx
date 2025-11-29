@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Award,
@@ -34,11 +34,23 @@ const haloGradient = {
 const CelebrantProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const [celebrant, setCelebrant] = useState<EnrichedCelebrant | null>(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const locationCelebrant = (location.state as any)?.celebrant as EnrichedCelebrant | undefined;
+  const [celebrant, setCelebrant] = useState<EnrichedCelebrant | null>(locationCelebrant ?? null);
+  const [loading, setLoading] = useState(!locationCelebrant);
 
   useEffect(() => {
     let active = true;
+
+    // If we arrived via a Link with state, use it immediately
+    if (locationCelebrant && (locationCelebrant.slug === slug || locationCelebrant.id === Number(slug))) {
+      setCelebrant(locationCelebrant);
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
     if (!slug) {
       setLoading(false);
       return () => undefined;
@@ -56,7 +68,7 @@ const CelebrantProfile: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, locationCelebrant]);
 
   const pageFontHeading = { fontFamily: '"Playfair Display", "Bricolage Grotesque", serif' };
   const pageFontBody = { fontFamily: '"Plus Jakarta Sans", "Bricolage Grotesque", sans-serif' };

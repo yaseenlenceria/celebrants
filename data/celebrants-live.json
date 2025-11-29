@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "lastUpdated": null,
+  "source": "RapidAPI Maps Data",
+  "metadata": {
+    "totalCelebrants": 0,
+    "countries": [],
+    "cities": [],
+    "exportDuration": "0 seconds"
+  },
+  "celebrants": []
+}

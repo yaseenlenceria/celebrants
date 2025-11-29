@@ -146,9 +146,8 @@ const Directory: React.FC = () => {
           setDataSource('Live API');
         }
 
-        if (!useStaticData) {
-          localStorage.setItem(cacheKey, JSON.stringify(results));
-        }
+        // Always cache the latest live pull so profile deep-links don't render blank pages
+        localStorage.setItem(cacheKey, JSON.stringify(results));
       } catch (error) {
         if (!active) return;
         setDataSource('Error loading data');
@@ -356,11 +355,14 @@ const Directory: React.FC = () => {
               const displayLocation = celebrant.livePlace?.fullAddress || celebrant.location;
               const rating = celebrant.livePlace?.rating ?? celebrant.rating;
               const image = celebrant.livePlace?.photos?.[0] || celebrant.image || fallbackImage;
+              const mapLink = celebrant.livePlace?.placeLink || celebrant.googleUrl || '#';
 
               return (
-                <Link
+                <a
                   key={`live-${celebrant.slug}-${idx}`}
-                  to={`/celebrants/${celebrant.slug}`}
+                  href={mapLink}
+                  target={mapLink === '#' ? undefined : '_blank'}
+                  rel="noreferrer"
                   className="group celebrant-card bg-white border border-sage-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer"
                 >
                   <div className="h-80 w-full overflow-hidden relative">
@@ -375,7 +377,7 @@ const Directory: React.FC = () => {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-ink-900/60 via-ink-900/20 to-transparent" />
                     <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-sm px-4 py-2 text-sm font-bold text-champagne-600 shadow-lg">
-                      <Star className="h-5 w-5 fill-champagne-400 text-champagne-400" /> {rating ? rating.toFixed(1) : '�'}
+                      <Star className="h-5 w-5 fill-champagne-400 text-champagne-400" /> {rating ? rating.toFixed(1) : 'N/A'}
                     </div>
                     <div className="absolute top-4 left-4">
                       <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-white px-4 py-2 text-xs uppercase tracking-[0.14em] font-semibold shadow-lg">
@@ -407,7 +409,7 @@ const Directory: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </Link>
+                </a>
               );
             })}
           </div>
@@ -417,8 +419,6 @@ const Directory: React.FC = () => {
 
         <div className="border-t border-sage-100 pt-10">
           <h2 className="text-2xl font-bold text-charcoal-800 font-serif mb-4">Curated profiles (full details)</h2>
-          <p className="text-charcoal-600 mb-6">Showing {filteredStatic.length} of {totalCount} curated celebrants.</p>
-
           {loading ? (
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
@@ -501,7 +501,7 @@ const Directory: React.FC = () => {
                         )}
                       </div>
                     </div>
-                  </Link>
+                  </a>
                 );
               })}
             </div>
@@ -547,3 +547,13 @@ const Directory: React.FC = () => {
 };
 
 export default Directory;
+
+
+
+
+
+
+
+
+
+

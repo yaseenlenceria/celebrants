@@ -20,192 +20,154 @@ export interface LivePlaceData {
   reviews: LivePlaceReview[];
 }
 
-const API_HOST = 'maps-data.p.rapidapi.com';
-const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY || process.env.VITE_RAPIDAPI_KEY;
+const JINA_BASE_URL = import.meta.env.VITE_JINA_BASE_URL || process.env.VITE_JINA_BASE_URL || 'https://deepsearch.jina.ai/v1/chat/completions';
+const JINA_API_KEY = import.meta.env.VITE_JINA_API_KEY || process.env.VITE_JINA_API_KEY;
+const JINA_SEARCH_MODEL =
+  import.meta.env.VITE_JINA_SEARCH_MODEL || process.env.VITE_JINA_SEARCH_MODEL || 'jina-deepsearch-v1';
 
-interface FetchPlaceOptions {
-  businessId: string;
-  placeId?: string;
-  country?: string;
-  lang?: string;
-  limit?: number;
-  sort?: 'Relevant' | 'Newest' | 'HighestRating' | 'LowestRating';
-}
+const missingKeyError = 'Missing VITE_JINA_API_KEY in your environment (.env.local)';
 
-interface RawMapsPhoto {
-  url?: string;
-  src?: string;
-  description?: string | null;
-}
+type UnknownRecord = Record<string, unknown>;
 
-interface RawMapsReview {
-  user_name?: string;
-  review_text?: string;
-  review_rate?: number;
-  review_time?: string;
-  review_link?: string;
-}
-
-interface RawMapsResponse {
-  data?: {
-    business_id?: string;
-    name?: string;
-    full_address?: string;
-    latitude?: number;
-    longitude?: number;
-    review_count?: number;
-    rating?: number;
-    website?: string | null;
-    website_full?: string | null;
-    place_id?: string;
-    place_link?: string;
-    photos?: RawMapsPhoto[];
-    reviews?: RawMapsReview[];
-  };
-}
-
-interface RawSearchMapsItem {
-  business_id?: string;
-  name?: string;
-  full_address?: string;
-  rating?: number;
-  place_id?: string;
-  place_link?: string;
-  photos?: RawMapsPhoto[];
-  website?: string | null;
-}
-
-const missingKeyError = 'Missing VITE_RAPIDAPI_KEY in your environment (.env.local)';
-
-const mapReviews = (reviews?: RawMapsReview[]): LivePlaceReview[] => {
-  if (!reviews) return [];
-  return reviews
-    .map((review) => ({
-      author: review.user_name?.trim() || 'Recent visitor',
-      rating: review.review_rate ?? 0,
-      text: review.review_text?.trim() || 'No review text available.',
-      relativeTime: review.review_time ?? 'Recently',
-      link: review.review_link,
-    }))
-    .filter((review) => Boolean(review.text));
-};
-
-const dedupePhotos = (photos: string[]) => Array.from(new Set(photos.filter(Boolean)));
-
-const fetchJson = async (url: URL) => {
-  if (!API_KEY) {
-    throw new Error(missingKeyError);
+const normalizePhotos = (input: unknown): string[] => {
+  if (!input) return [];
+  if (Array.isArray(input)) {
+    return Array.from(new Set(input.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)));
   }
-
-  // Log request details
-  const maskedKey = API_KEY.length > 8
-    ? `${API_KEY.slice(0, 4)}...${API_KEY.slice(-4)}`
-    : '****';
-  console.log('[RapidAPI fetchJson] Request URL:', url.toString());
-  console.log('[RapidAPI fetchJson] API Key (masked):', maskedKey);
-
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    headers: {
-      'x-rapidapi-host': API_HOST,
-      'x-rapidapi-key': API_KEY,
-    },
-  });
-
-  // Log response status
-  console.log('[RapidAPI fetchJson] Response status:', response.status);
-  console.log('[RapidAPI fetchJson] Response ok:', response.ok);
-
-  if (!response.ok) {
-    throw new Error(`RapidAPI request failed (${response.status})`);
+  if (typeof input === 'string') {
+    return [input];
   }
-
-  const data = await response.json();
-
-  // Log if data is present
-  console.log('[RapidAPI fetchJson] Data present:', !!data);
-  console.log('[RapidAPI fetchJson] Data structure:', JSON.stringify(data, null, 2));
-
-  return data;
-};
-
-const fetchPlacePhotos = async (options: FetchPlaceOptions): Promise<string[]> => {
-  const url = new URL('https://maps-data.p.rapidapi.com/photos.php');
-  url.searchParams.set('business_id', options.businessId);
-  if (options.placeId) url.searchParams.set('place_id', options.placeId);
-  url.searchParams.set('country', options.country || 'us');
-  url.searchParams.set('lang', options.lang || 'en');
-
-  const raw: any = await fetchJson(url);
-  const payload = raw?.data;
-
-  if (!payload) return [];
-
-  if (Array.isArray(payload)) {
-    return dedupePhotos(payload.map((item: RawMapsPhoto) => item?.url || item?.src || ''));
+  if (typeof input === 'object' && input !== null) {
+    const maybePhoto = (input as UnknownRecord).url || (input as UnknownRecord).src;
+    if (typeof maybePhoto === 'string') return [maybePhoto];
   }
-
-  if (Array.isArray(payload.photos)) {
-    return dedupePhotos(payload.photos.map((item: RawMapsPhoto) => item?.url || item?.src || ''));
-  }
-
   return [];
 };
 
-export const fetchPlaceSnapshot = async (
-  options: FetchPlaceOptions,
-  { includePhotos = true }: { includePhotos?: boolean } = {}
-): Promise<LivePlaceData> => {
-  if (!API_KEY) {
-    throw new Error(missingKeyError);
+const coerceNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
+  return undefined;
+};
 
-  const url = new URL('https://maps-data.p.rapidapi.com/reviews.php');
-  url.searchParams.set('business_id', options.businessId);
-  if (options.placeId) url.searchParams.set('place_id', options.placeId);
-  url.searchParams.set('country', options.country || 'us');
-  url.searchParams.set('lang', options.lang || 'en');
-  url.searchParams.set('limit', String(options.limit ?? 6));
-  url.searchParams.set('sort', options.sort || 'Relevant');
+const parseJsonContent = (content: string): UnknownRecord => {
+  const trimmed = content.trim();
+  const codeBlockMatch = trimmed.match(/```(?:json)?\n([\s\S]*?)```/i);
+  const candidate = codeBlockMatch ? codeBlockMatch[1] : trimmed;
 
-  console.log('[RapidAPI fetchPlaceSnapshot] Request URL:', url.toString());
-
-  const raw: RawMapsResponse = await fetchJson(url);
-  const payload = raw.data;
-
-  console.log('[RapidAPI fetchPlaceSnapshot] Payload present:', !!payload);
-  if (payload) {
-    console.log('[RapidAPI fetchPlaceSnapshot] Place name:', payload.name);
-    console.log('[RapidAPI fetchPlaceSnapshot] Place rating:', payload.rating);
-    console.log('[RapidAPI fetchPlaceSnapshot] Photos count:', payload.photos?.length || 0);
+  try {
+    return JSON.parse(candidate);
+  } catch (error) {
+    console.warn('[Jina parseJsonContent] Failed to parse JSON, returning empty object', error);
+    return {};
   }
+};
 
-  if (!payload) {
-    throw new Error('RapidAPI response missing data');
-  }
+const pickPlacesArray = (payload: UnknownRecord): UnknownRecord[] => {
+  if (!payload) return [];
+  if (Array.isArray((payload as any).places)) return (payload as any).places as UnknownRecord[];
+  if (Array.isArray((payload as any).results)) return (payload as any).results as UnknownRecord[];
+  if (Array.isArray((payload as any).data)) return (payload as any).data as UnknownRecord[];
+  return [];
+};
 
-  let photos = (payload.photos || [])
-    .map((photo) => photo.url || photo.src)
-    .filter((url): url is string => Boolean(url));
+const mapPlace = (place: UnknownRecord, fallbackId: string): LivePlaceData => {
+  const businessId =
+    (place.businessId as string) ||
+    (place.business_id as string) ||
+    (place.placeId as string) ||
+    (place.place_id as string) ||
+    (place.google_id as string) ||
+    (place.maps_id as string) ||
+    (place.placeLink as string) ||
+    (place.maps_url as string) ||
+    fallbackId;
 
-  if (includePhotos) {
-    const extraPhotos = await fetchPlacePhotos(options).catch(() => []);
-    photos = dedupePhotos([...photos, ...extraPhotos]);
-  }
+  const lat = coerceNumber((place.coordinates as any)?.lat) ?? coerceNumber((place as any).lat);
+  const lng = coerceNumber((place.coordinates as any)?.lng) ?? coerceNumber((place as any).lng);
+
+  const rating = coerceNumber(place.rating);
+  const reviewCount = coerceNumber((place as any).reviewCount ?? (place as any).reviews_count);
+
+  const placeLink =
+    (place.placeLink as string) ||
+    (place.maps_url as string) ||
+    (place.google_maps_url as string) ||
+    (place.url as string) ||
+    (place.map_url as string);
 
   return {
-    businessId: payload.business_id ?? options.businessId,
-    name: payload.name || 'Unknown place',
-    fullAddress: payload.full_address,
-    coordinates: payload.latitude && payload.longitude ? { lat: payload.latitude, lng: payload.longitude } : undefined,
-    rating: payload.rating,
-    reviewCount: payload.review_count,
-    website: payload.website_full || payload.website || undefined,
-    placeId: payload.place_id || options.placeId,
-    placeLink: payload.place_link,
-    photos,
-    reviews: mapReviews(payload.reviews),
+    businessId,
+    name: (place.name as string) || 'Unknown place',
+    fullAddress:
+      (place.fullAddress as string) ||
+      (place.address as string) ||
+      (place.formatted_address as string) ||
+      (place.location as string),
+    coordinates: lat !== undefined && lng !== undefined ? { lat, lng } : undefined,
+    rating,
+    reviewCount,
+    website: (place.website as string) || (place.site as string) || undefined,
+    placeId: (place.placeId as string) || (place.place_id as string),
+    placeLink,
+    photos: normalizePhotos((place as any).photos || (place as any).photo || (place as any).image),
+    reviews: [],
   };
+};
+
+const buildUserPrompt = (params: {
+  query: string;
+  country?: string;
+  lat?: number;
+  lng?: number;
+  limit: number;
+}): string => {
+  const locationHints = [] as string[];
+  if (params.country) locationHints.push(`country: ${params.country}`);
+  if (params.lat !== undefined && params.lng !== undefined)
+    locationHints.push(`coordinates: (${params.lat}, ${params.lng})`);
+
+  const celebrantTypes = [
+    'wedding celebrant', 'marriage celebrant', 'civil celebrant',
+    'independent celebrant', 'humanist celebrant', 'interfaith celebrant',
+    'civil ceremony officiant', 'marriage officiant', 'wedding officiant',
+    'celebrancy services', 'ceremony celebrant', 'vow renewal celebrant'
+  ];
+
+  // Enhance the query with related celebrant terms
+  let enhancedQuery = params.query;
+  if (!celebrantTypes.some(type => params.query.toLowerCase().includes(type))) {
+    enhancedQuery = `${params.query} ${celebrantTypes.slice(0, 3).join(' OR ')}`;
+  }
+
+  return [
+    `Search Google Maps for real businesses that match: "${enhancedQuery}".`,
+    `Look for actual wedding celebrants, marriage officiants, civil ceremony providers, and related professional services.`,
+    locationHints.length ? `Geographically bias results to ${locationHints.join(' | ')}.` : '',
+    `Find up to ${params.limit} verified businesses with real physical locations or service areas.`,
+    '',
+    'Return ONLY valid JSON with this exact structure:',
+    '{"places": [{"businessId":"string","name":"string","fullAddress":"string","rating":number,"website":"string","placeLink":"https url","photos":["https url"],"reviewCount":number}]}',
+    '',
+    'Requirements:',
+    '- businessId: unique identifier (Google Place ID, business ID, or similar)',
+    '- name: actual business name as shown on Google Maps',
+    '- fullAddress: complete service address or coverage area',
+    '- rating: average Google rating (number, not string)',
+    '- website: official business website if available',
+    '- placeLink: direct Google Maps URL for the business',
+    '- photos: array of business photos from Google Maps',
+    '- reviewCount: total number of Google reviews',
+    '',
+    'Focus on real, operating businesses. Avoid duplicate entries.',
+    'Use exact Google Maps share URLs for placeLink.',
+    'Only include results that are actually wedding/ceremony related businesses.',
+  ]
+    .filter(Boolean)
+    .join('\n');
 };
 
 export const searchMapsPlaces = async (params: {
@@ -218,75 +180,55 @@ export const searchMapsPlaces = async (params: {
   offset?: number;
   zoom?: number;
 }): Promise<LivePlaceData[]> => {
-  if (!API_KEY) {
+  if (!JINA_API_KEY) {
     throw new Error(missingKeyError);
   }
 
-  const url = new URL('https://maps-data.p.rapidapi.com/searchmaps.php');
-  url.searchParams.set('query', params.query);
-  url.searchParams.set('limit', String(params.limit ?? 20));
-  url.searchParams.set('country', params.country || 'us');
-  url.searchParams.set('lang', params.lang || 'en');
-  if (params.lat !== undefined) url.searchParams.set('lat', String(params.lat));
-  if (params.lng !== undefined) url.searchParams.set('lng', String(params.lng));
-  if (params.offset !== undefined) url.searchParams.set('offset', String(params.offset));
-  if (params.zoom !== undefined) url.searchParams.set('zoom', String(params.zoom));
+  const limit = params.limit && params.limit > 0 ? params.limit : 20;
+  const userPrompt = buildUserPrompt({ query: params.query, country: params.country, lat: params.lat, lng: params.lng, limit });
 
-  console.log('[RapidAPI searchMapsPlaces] Constructed URL with params:', url.toString());
-  console.log('[RapidAPI searchMapsPlaces] Query params:', {
-    query: params.query,
-    limit: params.limit ?? 20,
-    country: params.country || 'us',
-    lang: params.lang || 'en',
-    lat: params.lat,
-    lng: params.lng,
-    offset: params.offset,
-    zoom: params.zoom,
+  const body = {
+    model: JINA_SEARCH_MODEL,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a data agent that fetches Google Maps business details and returns only the requested JSON. Do not include markdown, comments, or explanations.',
+      },
+      { role: 'user', content: userPrompt },
+    ],
+    stream: false,
+    temperature: 0,
+    reasoning_effort: 'medium',
+    response_format: { type: 'json_object' },
+  };
+
+  const res = await fetch(JINA_BASE_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${JINA_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
   });
 
-  const raw: { data?: RawSearchMapsItem[] } = await fetchJson(url);
-  const items = raw.data || [];
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Jina request failed (${res.status}): ${errorText.slice(0, 400)}`);
+  }
 
-  console.log('[RapidAPI searchMapsPlaces] Raw response structure:', {
-    hasData: !!raw.data,
-    dataIsArray: Array.isArray(raw.data),
-    rawDataLength: items.length,
-  });
-  console.log('[RapidAPI searchMapsPlaces] Items in raw.data array:', items.length);
+  const data = (await res.json()) as UnknownRecord;
+  const content = (data as any)?.choices?.[0]?.message?.content as string;
 
-  const mapped = items.map((item) => {
-    const photos = (item.photos || []).map((p) => p.url || p.src || '').filter(Boolean);
-    return {
-      businessId: item.business_id || 'unknown',
-      name: item.name || 'Unknown place',
-      fullAddress: item.full_address,
-      rating: item.rating,
-      photos,
-      placeId: item.place_id,
-      placeLink: item.place_link,
-      reviews: [],
-      website: item.website || undefined,
-    } as LivePlaceData;
-  });
+  if (!content) {
+    console.warn('[Jina searchMapsPlaces] Empty response content from API');
+    return [];
+  }
 
-  const filtered = mapped.filter((item) => {
-    const passes = !!item.businessId && item.businessId !== 'unknown';
-    if (!passes) {
-      console.log('[RapidAPI searchMapsPlaces] Filtered out item:', {
-        name: item.name,
-        businessId: item.businessId,
-        reason: !item.businessId ? 'no businessId' : 'businessId is unknown',
-      });
-    }
-    return passes;
-  });
+  const parsed = parseJsonContent(content);
+  const places = pickPlacesArray(parsed);
 
-  console.log('[RapidAPI searchMapsPlaces] Items after filtering:', filtered.length);
-  console.log('[RapidAPI searchMapsPlaces] Sample filtered results:', filtered.slice(0, 3).map(r => ({
-    name: r.name,
-    businessId: r.businessId,
-    rating: r.rating,
-  })));
-
-  return filtered;
+  return places
+    .map((place, index) => mapPlace(place, `${params.query}-${index}`))
+    .filter((item) => Boolean(item.businessId));
 };

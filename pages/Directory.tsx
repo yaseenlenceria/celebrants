@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Search, Star, Sparkles, Quote, ArrowUpRight, Globe, ExternalLink, Database, RefreshCw } from 'lucide-react';
+import { MapPin, Search, Star, Sparkles, Quote, ArrowUpRight, Globe, ExternalLink, Database, RefreshCw, Map as MapIcon, List } from 'lucide-react';
 import { EnrichedCelebrant, getCelebrants, fetchLiveDirectory, getCelebrantsFromStaticFile } from '../services/celebrantService';
 import staticDataJson from '../data/celebrants-live.json';
+import CelebrantMap from '../components/CelebrantMap';
 
 const testimonials = [
   {
@@ -22,7 +23,7 @@ const testimonials = [
   },
 ];
 
-const fallbackImage = 'https://via.placeholder.com/640x360?text=Listing+image';
+const fallbackImage = 'https://via.placeholder.com/1200x900?text=Listing+image';
 
 const liveCelebrations = [
   { city: 'London', couple: 'Isla & Jamie', moment: 'Rooftop confetti just went up!' },
@@ -80,8 +81,10 @@ const Directory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [liveResults, setLiveResults] = useState<EnrichedCelebrant[]>([]);
   const [liveLoading, setLiveLoading] = useState(false);
-  const [useStaticData, setUseStaticData] = useState(true);
+  const [useStaticData, setUseStaticData] = useState(false);
   const [dataSource, setDataSource] = useState<string>('Static Database');
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [selectedCelebrant, setSelectedCelebrant] = useState<EnrichedCelebrant | null>(null);
 
   useEffect(() => {
     const ticker = setInterval(() => {
@@ -116,7 +119,7 @@ const Directory: React.FC = () => {
         try {
           const parsed = JSON.parse(cached);
           setLiveResults(parsed);
-          setDataSource('Live API (Cached)');
+          setDataSource('Jina Search (Cached)');
         } catch (e) {
           // ignore parse errors
         }
@@ -143,7 +146,7 @@ const Directory: React.FC = () => {
             : 'Never';
           setDataSource(`Static Database (updated: ${lastUpdated})`);
         } else {
-          setDataSource('Live API');
+          setDataSource('Jina Search (Live)');
         }
 
         // Always cache the latest live pull so profile deep-links don't render blank pages
@@ -221,6 +224,26 @@ const Directory: React.FC = () => {
       .map((item) => item.celebrant);
   }, [searchQuery, selectedType, selectedCountry, selectedLocation, celebrantList]);
 
+  // Combine live results and filtered static results for map view
+  const allResults = useMemo(() => {
+    const combined = [...liveResults, ...filteredStatic];
+    // Remove duplicates based on businessId or slug
+    const unique = combined.filter((celebrant, index, self) =>
+      index === self.findIndex((c) =>
+        c.businessId === celebrant.businessId || c.slug === celebrant.slug
+      )
+    );
+    return unique;
+  }, [liveResults, filteredStatic]);
+
+  // Filter results that have coordinates for map display
+  const resultsWithCoordinates = useMemo(() => {
+    return allResults.filter(celebrant =>
+      (celebrant.livePlace?.coordinates || celebrant.coordinates) &&
+      typeof (celebrant.livePlace?.coordinates || celebrant.coordinates)[0] === 'number'
+    );
+  }, [allResults]);
+
   const totalCount = celebrantList.length;
 
   return (
@@ -237,35 +260,35 @@ const Directory: React.FC = () => {
                 Book the right celebrant, right where you are
               </h1>
               <p className="text-lg text-charcoal-600">
-                We fetch real listings via RapidAPI and keep your curated profiles below for full details.
+                We fetch live Google Maps listings via Jina Search Foundation and keep your curated profiles below for full details.
               </p>
             </div>
             <div className="w-full max-w-lg">
-              <div className="rounded-3xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl p-6 space-y-4">
-                <div className="flex flex-col gap-3 text-sm text-cream-50">
+              <div className="rounded-3xl bg-white/95 backdrop-blur-lg border border-white/30 shadow-2xl p-6 space-y-4">
+                <div className="flex flex-col gap-3 text-sm">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-champagne/20 flex items-center justify-center text-champagne-100 font-semibold">1</div>
+                    <div className="h-10 w-10 rounded-full bg-champagne/30 flex items-center justify-center text-champagne-800 font-semibold">1</div>
                     <div>
-                      <p className="font-semibold text-white">Set your location</p>
-                      <p className="text-cream-200/80">Live listings are pulled near your filters.</p>
+                      <p className="font-semibold text-charcoal-800">Set your location</p>
+                      <p className="text-charcoal-600">Live listings are pulled near your filters.</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-champagne/20 flex items-center justify-center text-champagne-100 font-semibold">2</div>
+                    <div className="h-10 w-10 rounded-full bg-champagne/30 flex items-center justify-center text-champagne-800 font-semibold">2</div>
                     <div>
-                      <p className="font-semibold text-white">Pick ceremony style</p>
-                      <p className="text-cream-200/80">Luxury, story-driven, interfaith, bilingual, elopements.</p>
+                      <p className="font-semibold text-charcoal-800">Pick ceremony style</p>
+                      <p className="text-charcoal-600">Luxury, story-driven, interfaith, bilingual, elopements.</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-champagne/20 flex items-center justify-center text-champagne-100 font-semibold">3</div>
+                    <div className="h-10 w-10 rounded-full bg-champagne/30 flex items-center justify-center text-champagne-800 font-semibold">3</div>
                     <div>
-                      <p className="font-semibold text-white">Open listing</p>
-                      <p className="text-cream-200/80">Live cards open Google Maps; curated cards open profiles.</p>
+                      <p className="font-semibold text-charcoal-800">Open listing</p>
+                      <p className="text-charcoal-600">Live cards open Google Maps; curated cards open profiles.</p>
                     </div>
                   </div>
                 </div>
-                {liveLoading && <p className="text-xs text-cream-100">Fetching live listings�</p>}
+                {liveLoading && <p className="text-xs text-charcoal-600">Fetching live listings...</p>}
               </div>
             </div>
           </div>
@@ -275,8 +298,45 @@ const Directory: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div>
-            <h2 className="text-2xl font-bold text-charcoal-800 font-serif">Live maps listings</h2>
-            <p className="text-charcoal-600">Up to ~100 results per query. Showing {liveResults.length}.</p>
+            <div className="flex items-center gap-4 mb-2">
+              <h2 className="text-2xl font-bold text-charcoal-800 font-serif">
+                {viewMode === 'map' ? 'Interactive Map View' : 'Directory Listings'}
+              </h2>
+              <div className="flex bg-white rounded-2xl border border-sage-200 p-1">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-champagne text-white'
+                      : 'text-charcoal-600 hover:text-charcoal-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    List View
+                  </div>
+                </button>
+                <button
+                  onClick={() => setViewMode('map')}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    viewMode === 'map'
+                      ? 'bg-champagne text-white'
+                      : 'text-charcoal-600 hover:text-charcoal-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <MapIcon className="h-4 w-4" />
+                    Map View
+                  </div>
+                </button>
+              </div>
+            </div>
+            <p className="text-charcoal-600">
+              {viewMode === 'map'
+                ? `Showing ${resultsWithCoordinates.length} celebrants with location data on the map.`
+                : `Up to ~100 results per query. Showing ${liveResults.length} live listings.`
+              }
+            </p>
             <div className="mt-2 flex items-center gap-2">
               <Database className="h-4 w-4 text-champagne-600" />
               <span className="text-sm text-charcoal-600">
@@ -294,7 +354,7 @@ const Directory: React.FC = () => {
               />
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-4 w-4 text-charcoal-600" />
-                <span className="text-sm font-medium text-charcoal-700">Use Live API</span>
+                <span className="text-sm font-medium text-charcoal-700">Use Jina live search</span>
               </div>
             </label>
           </div>
@@ -348,9 +408,129 @@ const Directory: React.FC = () => {
           </div>
         </div>
 
-        {liveResults.length > 0 ? (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {liveResults.map((celebrant, idx) => {
+        {/* Map View */}
+        {viewMode === 'map' ? (
+          <div className="space-y-6">
+            <CelebrantMap
+              celebrants={resultsWithCoordinates}
+              selectedCelebrant={selectedCelebrant}
+              onCelebrantSelect={setSelectedCelebrant}
+              className="w-full"
+            />
+
+            {/* Selected Celebrant Detail Card */}
+            {selectedCelebrant && (
+              <div className="glass-surface rounded-3xl p-6 border border-sage-200 shadow-xl">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="lg:w-1/3">
+                    {(selectedCelebrant.livePlace?.photos?.[0] || selectedCelebrant.image) && (
+                      <img
+                        src={selectedCelebrant.livePlace?.photos?.[0] || selectedCelebrant.image}
+                        alt={selectedCelebrant.livePlace?.name || selectedCelebrant.name}
+                        className="w-full h-48 lg:h-full object-cover rounded-2xl"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=No+Image';
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="lg:w-2/3 space-y-4">
+                    <div>
+                      <h3 className="text-2xl font-bold text-charcoal-800">
+                        {selectedCelebrant.livePlace?.name || selectedCelebrant.name}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-champagne/20 text-champagne-dark border border-champagne/30">
+                          {selectedCelebrant.type}
+                        </span>
+                        <span className="text-sm text-charcoal-600">• {selectedCelebrant.country}</span>
+                      </div>
+                    </div>
+
+                    {selectedCelebrant.livePlace?.rating && (
+                      <div className="flex items-center gap-2">
+                        <Star className="h-5 w-5 fill-champagne text-champagne" />
+                        <span className="font-semibold text-charcoal-800">
+                          {selectedCelebrant.livePlace.rating.toFixed(1)}
+                        </span>
+                        {selectedCelebrant.livePlace.reviewCount && (
+                          <span className="text-sm text-charcoal-600">
+                            ({selectedCelebrant.livePlace.reviewCount} reviews)
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-start gap-2 text-sm text-charcoal-600">
+                      <MapPin className="h-4 w-4 text-champagne mt-0.5 flex-shrink-0" />
+                      <span>{selectedCelebrant.livePlace?.fullAddress || selectedCelebrant.location}</span>
+                    </div>
+
+                    {selectedCelebrant.description && (
+                      <p className="text-sm text-charcoal-600 leading-relaxed">
+                        {selectedCelebrant.description}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-3 pt-4 border-t border-sage-100">
+                      <Link
+                        to={`/celebrants/${selectedCelebrant.slug}`}
+                        state={{ celebrant: selectedCelebrant }}
+                        className="inline-flex items-center gap-2 bg-champagne text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-champagne-dark transition-colors"
+                      >
+                        View Full Profile
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Link>
+                      {selectedCelebrant.livePlace?.placeLink && (
+                        <a
+                          href={selectedCelebrant.livePlace.placeLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-sage-200 text-charcoal-800 px-6 py-2 rounded-full text-sm font-semibold hover:bg-sage-300 transition-colors"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Google Maps
+                        </a>
+                      )}
+                      {selectedCelebrant.livePlace?.website && (
+                        <a
+                          href={selectedCelebrant.livePlace.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 border border-sage-200 text-charcoal-800 px-6 py-2 rounded-full text-sm font-semibold hover:bg-cream-100 transition-colors"
+                        >
+                          <Globe className="h-4 w-4" />
+                          Website
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Map Statistics */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl border border-sage-200 p-4 text-center">
+                <p className="text-2xl font-bold text-charcoal-800">{resultsWithCoordinates.length}</p>
+                <p className="text-sm text-charcoal-600">On Map</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-sage-200 p-4 text-center">
+                <p className="text-2xl font-bold text-charcoal-800">{allResults.length}</p>
+                <p className="text-sm text-charcoal-600">Total Results</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-sage-200 p-4 text-center">
+                <p className="text-2xl font-bold text-charcoal-800">{selectedCountry === 'All Countries' ? 'UK & Ireland' : selectedCountry}</p>
+                <p className="text-sm text-charcoal-600">Coverage</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* List View - Live Results */}
+            {liveResults.length > 0 ? (
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {liveResults.map((celebrant, idx) => {
               const displayName = celebrant.livePlace?.name || celebrant.name;
               const displayLocation = celebrant.livePlace?.fullAddress || celebrant.location;
               const rating = celebrant.livePlace?.rating ?? celebrant.rating;
@@ -368,8 +548,10 @@ const Directory: React.FC = () => {
                     <img
                       src={image}
                       alt={displayName}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 image-crisp"
                       loading="lazy"
+                      width="1200"
+                      height="900"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = fallbackImage;
                       }}
@@ -461,8 +643,10 @@ const Directory: React.FC = () => {
                       <img
                         src={image}
                         alt={displayName}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 image-crisp"
                         loading="lazy"
+                        width="1200"
+                        height="900"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = fallbackImage;
                         }}
@@ -507,15 +691,17 @@ const Directory: React.FC = () => {
             </div>
           )}
         </div>
+        </>
+        )}
 
         <div className="mt-14 grid gap-6 lg:grid-cols-3">
           {testimonials.map((item) => (
             <div key={item.name} className="glass-surface rounded-2xl border border-sage-100 p-6 space-y-3">
-              <Quote className="h-8 w-8 text-champagne-400" />
-              <p className="text-charcoal-700 leading-relaxed">"{item.quote}"</p>
+              <Quote className="h-8 w-8 text-champagne-600" />
+              <p className="text-charcoal-800 leading-relaxed">"{item.quote}"</p>
               <div>
                 <p className="text-charcoal-800 font-semibold">{item.name}</p>
-                <p className="text-charcoal-600 text-sm">{item.location}</p>
+                <p className="text-charcoal-700 text-sm">{item.location}</p>
               </div>
             </div>
           ))}
